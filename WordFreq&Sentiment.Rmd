@@ -1,0 +1,391 @@
+---
+title: "Word Freq & Sentiment"
+author: "Huy Nguyen"
+date: "2023-02-24"
+output: html_document
+---
+
+```{r Import File}
+dat <- read.delim("No Longer Human.txt", header = F)
+dat$text <- dat$V1
+
+dat <- subset(dat, select = -c(V1))
+```
+
+```{r Load Library}
+library(tidyverse)
+library(stringr)
+library(scales)
+```
+
+#### DATA CLEANING
+```{r Extracting Line Number and Chapter as Attributes}
+dat2 <- dat %>%
+  mutate(linenumber = row_number(),
+         chapter = cumsum(str_detect(text, 
+                                     regex("^chapter [\\divxlc]",
+                                           ignore_case = TRUE))))
+
+dat2$chapter[dat2$chapter == 5] <- 4
+dat2$chapter[dat2$chapter == 6] <- 5
+```
+
+```{r Tokenization}
+library(tidytext)
+
+tidyDat <- dat2 %>% unnest_tokens(word,text)
+
+rm(list = c("dat", "dat2"))
+table(tidyDat$chapter)
+```
+
+```{r Convert string to lower cases}
+tidyDat$word <- str_to_lower(tidyDat$word, locale = "en")
+```
+
+```{r Lemmatization}
+library(textstem)
+tidyDat$word <- lemmatize_words(tidyDat$word)
+```
+
+```{r Remove stop-words}
+data("stop_words") #Default stop-words library
+
+customStopWords <- bind_rows(tibble(word = c("i’m", "it’s"),  
+                                      lexicon = c("custom")), 
+                               stop_words) #These words were prominent in the original word frequency but doesn't appear to have any significant meaning
+rm(stop_words)
+tidyDat <- tidyDat %>% anti_join(customStopWords) 
+save(tidyDat, file = "tidyDat.RData")
+```
+
+```{r Get Sentiment - AFINN}
+AFINN <- get_sentiments("afinn") #High variance
+
+table(AFINN$value)
+```
+
+```{r Labelling Sentiment}
+AFINN$Sentiment[AFINN$value < 0] <- "-"
+AFINN$Sentiment[AFINN$value == 0] <- "/" #None in this book
+AFINN$Sentiment[AFINN$value > 0] <- "+"
+
+AFINN <- AFINN %>% filter(Sentiment != "/") #Filter out 1 neutral word
+```
+
+#### WORD FREQUENCY
+```{r Storage}
+WD_Count <- list()
+WD_Graphs <- list()
+```
+
+##### Across the Book
+```{r Get Count Across the Book}
+datCount <- tidyDat %>% count(word, sort = T) %>% 
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 20)
+  
+WD_Graphs$book <- ggplot(datCount, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 3)+
+  scale_x_continuous(name = "Word Count")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  labs(title = "Word Frequency Across the Book",
+       caption = "'+' Indicates Positive Sentiment, '-' Indicates Negative Sentiment",
+       y = NULL)
+
+export::graph2png(WD_Graphs$book, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Book")
+```
+
+##### By Chapter
+```{r Prologue}
+WD_Count$datCntChpt1 <- tidyDat[tidyDat$chapter == 1,] %>%
+  count(word, sort = T) %>% 
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 10)
+
+#Graphing
+WD_Graphs$chpt1 <- ggplot(WD_Count$datCntChpt1, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 0.25)+
+  scale_x_continuous(name = "Word Count")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  labs(title = "Prologue Word Frequency",
+       caption = "'+' Indicates Positive Sentiment, '-' Indicates Negative Sentiment",
+       y = NULL)
+
+export::graph2png(WD_Graphs$chpt1, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Prologue")
+```
+
+```{r Chapter 1}
+WD_Count$datCntChpt2 <- tidyDat[tidyDat$chapter == 2,] %>%
+  count(word, sort = T) %>%
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 20)
+
+#Graphing
+WD_Graphs$chpt2 <- ggplot(WD_Count$datCntChpt2, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 1)+
+  scale_x_continuous(name = "Word Count")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  labs(title = "Chapter 1 Word Frequency",
+       caption = "'+' Indicates Positive Sentiment, '-' Indicates Negative Sentiment",
+       y = NULL)
+
+export::graph2png(WD_Graphs$chpt2, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Chapter 1")
+```
+
+```{r Chapter 2}
+WD_Count$datCntChpt3 <- tidyDat[tidyDat$chapter == 3,] %>%
+  count(word, sort = T) %>%
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 20)
+
+#Graphing
+WD_Graphs$chpt3 <- ggplot(WD_Count$datCntChpt3, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 1)+
+  scale_x_continuous(name = "Word Count")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  labs(title = "Chapter 2 Word Frequency",
+       caption = "'+' Indicates Positive Sentiment, '-' Indicates Negative Sentiment",
+       y = NULL)
+
+export::graph2png(WD_Graphs$chpt3, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Chapter 2")
+```
+
+```{r Chapter 3}
+WD_Count$datCntChpt4 <- tidyDat[tidyDat$chapter == 4,] %>%
+  count(word, sort = T) %>%
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 20)
+
+#Graphing
+WD_Graphs$chpt4 <- ggplot(WD_Count$datCntChpt4, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 1)+
+  scale_x_continuous(name = "Word Count")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  labs(title = "Chapter 3 Word Frequency",
+       caption = "'+' Indicates Positive Sentiment, '-' Indicates Negative Sentiment",
+       y = NULL)
+
+export::graph2png(WD_Graphs$chpt4, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Chapter 3")
+```
+
+```{r Epilogue}
+WD_Count$datCntChpt5 <- tidyDat[tidyDat$chapter == 5,] %>%
+  count(word, sort = T) %>%
+  merge(., AFINN, by.x = "word", by.y = "word", all.x = T) %>%
+  arrange(desc(n)) %>%
+  mutate(word = reorder(word, n)) %>%
+  head(., 10)
+
+#Graphing
+WD_Graphs$chpt5 <- ggplot(WD_Count$datCntChpt5, aes(n, word))+
+  theme_classic()+
+  geom_col(aes(fill = n),
+           show.legend = F)+
+  geom_text(aes(label = Sentiment),
+            nudge_x = 4)+
+  scale_x_continuous(name = "Word Count")+
+  theme(plot.title = element_text(face = "bold"))+
+  labs(title = "Epilogue Word Frequency",
+       y = NULL)
+
+export::graph2png(WD_Graphs$chpt5, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Word Frequency (Default)/Epilogue")
+```
+
+#### SENTIMENT ANALYSIS
+##### NARRATIVE ANALYSIS - SENTIMENT
+```{r Data Prepping}
+narrativeSent <- tidyDat %>%
+  inner_join(AFINN) %>%
+  count(chapter, index = linenumber %/% 20, Sentiment) %>%
+  pivot_wider(names_from = Sentiment, values_from = n, values_fill = 0) %>% #Count of sentiment (positive and negative) per index
+  mutate(Sentiment = `+` - `-`)
+
+narrativeSent$chapter[narrativeSent$chapter == "1"] <- "Prologue"
+narrativeSent$chapter[narrativeSent$chapter == "2"] <- "Chapter 1"
+narrativeSent$chapter[narrativeSent$chapter == "3"] <- "Chapter 2"
+narrativeSent$chapter[narrativeSent$chapter == "4"] <- "Chapter 3"
+narrativeSent$chapter[narrativeSent$chapter == "5"] <- "Epilogue"
+
+narrativeSent$chapter <- narrativeSent$chapter %>% as.factor() %>%
+  factor(levels = c("Prologue", "Chapter 1", "Chapter 2",
+                    "Chapter 3", "Epilogue"))
+```
+
+```{r Overarching Narrative}
+NarSentGraph <- ggplot(data = narrativeSent, aes(index, Sentiment))+
+  geom_col(fill = "#00A7E1")+
+  theme_classic()+
+  scale_x_continuous(name = "Index")+
+  scale_y_continuous(name = "Sentiment Delta (COUNT)")+
+  geom_hline(yintercept=c(0,0), linetype="dashed")+
+  theme(plot.title = element_text(face = "bold"))+
+  scale_x_continuous(name = "Index")+
+  labs(title = "Count of Sentiment throughout the Book",
+       subtitle = "Postive Score Indicates Higher Count of Positive Sentiments")
+
+export::graph2png(NarSentGraph, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Sentiment Analysis/Narrative Sentiment")
+```
+
+```{r By Chapter, fig.height = 2}
+byChapter <- ggplot(data = narrativeSent, aes(index, Sentiment, fill = chapter))+
+  geom_col(show.legend = F)+
+  theme_classic()+
+  geom_hline(yintercept=c(0,0), linetype="dashed")+
+  theme(plot.title = element_text(face = "bold"))+
+  scale_x_continuous(name = "Index")+
+  scale_y_continuous(name = "Sentiment Delta (COUNT)")+
+  labs(title = "Count of Sentiment by Chapter",
+       subtitle = "Postive Score Indicates Higher Count of Positive Sentiments")+
+  facet_wrap(~ chapter, ncol = 3, scales = "free_x")
+
+export::graph2png(byChapter, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Sentiment Analysis/By Chapter")
+```
+
+##### SENTIMENT CONTRIBUTION
+```{r}
+sentContr <- tidyDat %>%
+  count(word, sort = T) %>%
+  inner_join(AFINN) %>%
+  group_by(Sentiment) %>%
+  slice_head(n = 15) %>%
+  mutate(word = reorder(word, n)) %>%
+  ungroup()
+
+sentContr$Sentiment[sentContr$Sentiment == "-"] <- "Negative"
+sentContr$Sentiment[sentContr$Sentiment == "+"] <- "Positive"
+  
+g <- ggplot(sentContr, aes(n, word))+
+  geom_col(aes(fill = value))+
+  theme_classic()+
+  scale_fill_gradient2(position="bottom" ,
+                       low = "#BF3100",
+                       mid = "#E6E6EA",
+                       high = "#009FB7")+
+  theme(legend.title= element_blank(),
+        plot.title = element_text(face = "bold"))+
+  scale_x_continuous(name = "Word Count")+
+  facet_wrap(~Sentiment, ncol = 2, scales = "free_y")+
+  labs(title = "Most Common Sentimental Words throughout the Book",
+       subtitle = "Higher Saturation Indicates Stronger Sentiment",
+       y = NULL)
+
+export::graph2png(g, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Sentiment Analysis/Sentiment Contribution")
+```
+
+##### SENTIMENT WORDS RATIO
+```{r Get word count}
+AFINNSent <- AFINN %>% select(word, Sentiment)
+AFINNPos <- AFINN %>% filter(Sentiment == "+")
+AFINNNeg <- AFINN %>% filter(Sentiment == "-")
+
+wordCountChapter <- tidyDat %>% 
+  group_by(chapter) %>%
+  summarise(
+    words = n()
+  )
+```
+
+```{r Sentiment Ratio}
+Negative <- tidyDat %>% 
+  semi_join(AFINNNeg) %>%
+  group_by(chapter) %>%
+  summarise(
+    negativeWords = n()
+  )
+
+SentimentRatio <- tidyDat %>% 
+  semi_join(AFINNPos) %>%
+  group_by(chapter) %>%
+  summarise(
+    positiveWords = n()
+  ) %>%
+  left_join(Negative) %>%
+  left_join(wordCountChapter, by = c("chapter")) %>%
+  mutate(NegativePerc = percent((negativeWords/words)),
+         PositivePerc = percent((positiveWords/words))
+         ) %>%
+  ungroup()
+```
+
+
+```{r Book Sentiment Ratio}
+SUM_WORDS <- sum(SentimentRatio$words)
+
+SumSenRatio <- data.frame(
+  posWords = sum(SentimentRatio$positiveWords),
+  negWords = sum(SentimentRatio$negativeWords)
+)
+
+SumSenRatio <- SumSenRatio %>% 
+  mutate(
+    nonSenWords = SUM_WORDS - sum(c(posWords,negWords))
+  ) %>%
+  pivot_longer(c(posWords, negWords, nonSenWords), names_to = "Sentiment", values_to = "Count") %>%
+  mutate(
+    perc = Count/SUM_WORDS*100,
+    percLab = percent(Count / SUM_WORDS),
+  ) %>%
+  arrange(match(Sentiment, c("posWords", "nonSenWords", "negWords"))) %>% 
+  mutate(
+    ypos = ((cumsum(Count) - Count/2))
+  )
+  
+gr <- SumSenRatio
+gr$Sentiment[gr$Sentiment == "posWords"] <- "Positive"
+gr$Sentiment[gr$Sentiment == "negWords"] <- "Negative"
+gr$Sentiment[gr$Sentiment == "nonSenWords"] <- "Neither"
+
+gr <- ggplot(gr, aes(x = "", y = Count, fill = Sentiment))+
+  geom_col(width = 1, color = "white")+
+  coord_polar("y", start = 6.91)+
+  theme_void()+
+  scale_fill_manual(values = c( "#BF3100", "#436436", "#009FB7"))+
+  geom_label(aes(x = 1.75, y = ypos, label = percLab))+
+  labs(title = "Sentiment Ratio (BOOK)")+
+  theme(plot.title = element_text(hjust = 0.6, face = "bold"))+
+  guides(
+  fill = guide_legend(
+    title = "Sentiment",
+    override.aes = aes(label = "")
+    ))
+
+export::graph2png(gr, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/Sentiment Analysis/Sentiment Ratio (BOOK)")
+```
+
+

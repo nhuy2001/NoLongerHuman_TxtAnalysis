@@ -1,0 +1,53 @@
+---
+title: "TF-IDF"
+author: "Huy Nguyen"
+date: "2023-03-02"
+output: html_document
+---
+
+```{r Load Data}
+load("tidyDat.RData")
+library(tidyverse)
+```
+
+```{r Get Count}
+tidyDat <- tidyDat %>% count(word, chapter, sort = T)
+```
+
+```{r TF-IDF}
+library(tidytext)
+TF_IDF <- tidyDat %>% 
+  bind_tf_idf(word, chapter, n) %>%
+  arrange(desc(tf_idf))
+```
+
+```{r Recoding Chapter}
+TF_IDF$chapter[TF_IDF$chapter == "1"] <- "Prologue"
+TF_IDF$chapter[TF_IDF$chapter == "2"] <- "Chapter 1"
+TF_IDF$chapter[TF_IDF$chapter == "3"] <- "Chapter 2"
+TF_IDF$chapter[TF_IDF$chapter == "4"] <- "Chapter 3"
+TF_IDF$chapter[TF_IDF$chapter == "5"] <- "Epilogue"
+
+TF_IDF$chapter <- TF_IDF$chapter %>% as.factor()
+TF_IDF$chapter <- factor(TF_IDF$chapter, c("Prologue", "Chapter 1",
+                           "Chapter 2", "Chapter 3",
+                           "Epilogue"))
+```
+
+```{r Graphing, fig.height=3, fig.width=5}
+Graph <- TF_IDF %>% 
+  group_by(chapter) %>%
+  slice_max(tf_idf, n = 10) %>%
+  ungroup() %>%
+  
+  ggplot(aes(tf_idf, forcats::fct_reorder(word, tf_idf), fill = chapter))+
+  geom_col(show.legend = F)+
+  theme_classic()+
+  scale_x_continuous(name = "TF-IDF Score")+
+  theme(plot.title = element_text(face = "bold"))+
+  labs(title = "TF-IDF Score by Chapter")+
+  facet_wrap(~chapter, ncol = 3, scales = "free")+
+  labs(x = "TF_IDF",y = NULL)
+
+export::graph2png(Graph, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/TF-IDF/TF_IDF")
+```

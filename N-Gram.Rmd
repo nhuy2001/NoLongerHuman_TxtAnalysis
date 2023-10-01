@@ -1,0 +1,66 @@
+---
+title: "N-Gram Analysis"
+author: "Huy Nguyen"
+date: "2023-03-02"
+output: html_document
+---
+
+```{r Import File}
+dat <- read.delim("No Longer Human.txt", header = F)
+dat$text <- dat$V1
+
+dat <- subset(dat, select = -c(V1))
+```
+
+```{r Load Library}
+library(tidyverse)
+library(tidytext)
+```
+
+#### DATA CLEANING
+##### Bigram
+```{r Extracting Line Number and Chapter as Attributes}
+dat <- dat %>%
+  mutate(chapter = cumsum(str_detect(text,
+                                     regex("^chapter [\\divxlc]",
+                                           ignore_case = TRUE))))
+
+dat$chapter[dat$chapter == 5] <- 4
+dat$chapter[dat$chapter == 6] <- 5
+```
+
+```{r Tokenization}
+datBi <- dat %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  filter(!is.na(bigram))
+```
+
+```{r Convert string to lower cases}
+datBi$bigram <- str_to_lower(datBi$bigram, locale = "en")
+```
+
+```{r Remove Stop Words}
+datBi <- datBi %>% 
+  separate(
+    bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  unite(bigram, word1, word2, sep = " ") %>%
+  count(bigram, sort = TRUE) %>%
+  arrange(desc(n)) %>%
+  mutate(bigram = reorder(bigram, n)) %>%
+  head(20)
+  
+g <- ggplot(datBi,aes(n, bigram))+
+  geom_col(aes(fill = n), show.legend = F)+
+  theme_classic()+
+  scale_x_continuous(name = "Bi-Gram Count")+
+  labs(title = "Bi-Gram Frequency Across the Book",
+       y = NULL)+
+  theme(plot.title = element_text(face = "bold"),
+        legend.title= element_blank())
+
+export::graph2png(g, "C:/Users/Test/OneDrive/SPU/Courses/GR/Winter 2023/ISM 6359/Text Mining/Graphs/N-Gram/Plot")
+```
+
+#No. N-Gram is too small to do significant analysis
